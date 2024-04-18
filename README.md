@@ -46,4 +46,3 @@ Specify the license under which this repository is made available, such as MIT, 
 
 ## Contact
 For any queries regarding this project, please contact [Your Name or Project Maintainer Email].
-
