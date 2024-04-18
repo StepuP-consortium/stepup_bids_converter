@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "stepup-bids-converter-jw"
+version = "0.1.0"
+description = "This repo holds scripts to convert data to BIDS"
+authors = ["Julius Welzel <julius.welzel@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+mne = "^1.6.1"
+pyxdf = "^1.16.6"
+mnelab = "^0.9.0"
+pylsl = "^1.16.2"
+pandas = "^2.2.2"
+pybids = "^0.16.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
