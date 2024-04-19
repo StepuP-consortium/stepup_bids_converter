@@ -35,8 +35,8 @@ To run the scripts provided in this repository, you need:
 ## Usage
 1. Clone this repository to your local machine.
 2. Ensure your MATLAB path includes the FieldTrip toolbox.
-3. Place your original MATLAB `.mat` files in the `data/original/` directory.
-4. Run the script `convert_to_bids.m` from the MATLAB command window. This script reads the data from the `data/original/` directory, processes it, and writes the BIDS-compatible output to the `data/bids/` directory.
+3. Place your original MATLAB `.mat` files in the `data/source/` directory.
+4. Run the script `convert_to_bids.m` from the MATLAB command window. This script reads the data from the `data/source/` directory, processes it, and writes the BIDS-compatible output to the `data/bids/` directory.
 
 ## Contributing
 Contributions to this project are welcome. Please fork the repository and submit pull requests with any enhancements, bug fixes, or improvements.
@@ -45,4 +45,4 @@ Contributions to this project are welcome. Please fork the repository and submit
 Specify the license under which this repository is made available, such as MIT, GPL, etc.
 
 ## Contact
-For any queries regarding this project, please contact [Your Name or Project Maintainer Email].
+For any queries regarding this project, please contact [Julius Welzel](mailto:julius.welzel@gmail.com?subject=StepuP%20BIDS%20converter).
