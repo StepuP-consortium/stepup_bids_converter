@@ -34,6 +34,7 @@ for i = 1:length(datasets)
     subject = strsplit(datasets(i).name, '_');
     subject = subject{1};
     
+    %% EEG data
     % bids relevat  modality agnostic specs
     cfg.sub = subject;
 
@@ -46,18 +47,62 @@ for i = 1:length(datasets)
 
     % convert eeg 2 bids
     cfg.eeg.PowerLineFrequency = 50;   % since recorded in the EU
-    cfg.eeg.EEGReference       = 'Cz'; % actually I do not know, but let's assume it was left mastoid
+    cfg.eeg.EEGReference       = 'Cz'; % actually I do not know, but let's assume
     cfg.datatype  = 'eeg';
+    eeg.cfg.event = [];
     data2bids(cfg, eeg);
 
+    %% EMG data
     % read EMG data to fieldtrip format
-    emg.trial{1} = data.EMG;
-    emg.labels{1} = data.EMG_labels;
-    
+    emg.trial{1} = data.EMG';
+    emg.label = data.EMG_labels';
+    emg.time{1}  = linspace(0, length(data.EMG) / 2000, length(data.EMG))
     ft_checkdata(emg);
 
     % bids relevant emg specs
     cfg.emg.EMGReference    = 'bipolar';
+    cfg.datatype = 'emg';
     data2bids(cfg, emg);
+
+    %% MoCap data
+
+    mocap.trial{1} = [data.L_heel, data.R_heel, data.pelvis]';
+    mocap.label = {'LeftHeelPosX','LeftHeelPosY','LeftHeelPosZ',...
+                    'RightHeelPosX','RightHeelPosY','RightHeelPosZ',...
+                    'PelvisPosX','PelvisPosY','PelvisPosZ',...
+                    }';
+    mocap.time{1} = data.t_qls;
+
+    mocap = ft_datatype_raw(mocap);
+
+    % bids relevant mocap
+    cfg.tracksys                    = 'qualisys';
+    cfg.motion.TrackingSystemName   = 'qualisys';
+    cfg.motion.SpatialAxes          = 'FRU';
+    cfg.motion.RotationRule         = 'left-hand';
+    cfg.motion.RotationOrder        = 'ZXY';
+    cfg.motion.samplingrate         = data.fs_qls;
+
+    % specify channel details, this overrides the details in the original data structure
+    cfg.channels = [];
+    cfg.channels.name = mocap.label;
+    cfg.channels.type = cellstr(repmat('POS',length(mocap.label),1));
+    cfg.channels.unit = cellstr(repmat('m',length(mocap.label),1))
+    
+    cfg.channels.tracked_point = {
+      'left_heel',
+      'left_heel',
+      'left_heel',
+      'right_heel',
+      'right_heel',
+      'right_heel',
+      'pelvis',
+      'pelvis',
+      'pelvis'
+      };
+
+    cfg.datatype = 'motion';
+    data2bids(cfg, mocap);
+
     
 end
