@@ -35,7 +35,7 @@ for i = 1:length(datasets)
     subject = subject{1};
     
     %% EEG data
-    % bids relevat  modality agnostic specs
+    % bids relevant  modality agnostic specs
     cfg.sub = subject;
 
     % retrieve EEG data
@@ -47,7 +47,7 @@ for i = 1:length(datasets)
 
     % convert eeg 2 bids
     cfg.eeg.PowerLineFrequency = 50;   % since recorded in the EU
-    cfg.eeg.EEGReference       = 'Cz'; % actually I do not know, but let's assume
+    cfg.eeg.EEGReference       = 'CAR'; % actually I do not know, but let's assume
     cfg.datatype  = 'eeg';
     eeg.cfg.event = [];
     data2bids(cfg, eeg);
@@ -56,7 +56,7 @@ for i = 1:length(datasets)
     % read EMG data to fieldtrip format
     emg.trial{1} = data.EMG';
     emg.label = data.EMG_labels';
-    emg.time{1}  = linspace(0, length(data.EMG) / 2000, length(data.EMG))
+    emg.time{1}  = linspace(0, length(data.EMG) / 2148, length(data.EMG))
     ft_checkdata(emg);
 
     % bids relevant emg specs
@@ -79,15 +79,13 @@ for i = 1:length(datasets)
     cfg.tracksys                    = 'qualisys';
     cfg.motion.TrackingSystemName   = 'qualisys';
     cfg.motion.SpatialAxes          = 'FRU';
-    cfg.motion.RotationRule         = 'left-hand';
-    cfg.motion.RotationOrder        = 'ZXY';
     cfg.motion.samplingrate         = data.fs_qls;
 
     % specify channel details, this overrides the details in the original data structure
     cfg.channels = [];
     cfg.channels.name = mocap.label;
     cfg.channels.type = cellstr(repmat('POS',length(mocap.label),1));
-    cfg.channels.unit = cellstr(repmat('m',length(mocap.label),1))
+    cfg.channels.units = cellstr(repmat('m',length(mocap.label),1))
     
     cfg.channels.tracked_point = {
       'left_heel',
