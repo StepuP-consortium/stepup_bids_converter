@@ -7,7 +7,7 @@ dir_sourcedata = fullfile(dir_project, 'data', 'source');
 dir_bidsdata = fullfile(dir_project, 'data', 'bids');
 
 % add fieltrip
-addpath('C:\Users\User\Documents\MATLAB\toolboxes\fieldtrip-20230503')
+addpath('C:\Users\juliu\Documents\MATLAB\fieldtrip-20240129')
 ft_defaults
 
 [filepath,~,~] = fileparts(which('ft_defaults'));
@@ -69,14 +69,15 @@ cfg.InstitutionName             = 'Kiel University';
 
 % required for dataset_description.json
 cfg.dataset_description.Name                = 'StepuP';
-cfg.dataset_description.BIDSVersion         = '1.8';
+cfg.dataset_description.BIDSVersion         = '1.9';
 cfg.method = 'convert'; % the original data is in a BIDS -compliant format and can simply be copied
-cfg.bidsroot = './data/bids';  % write to the present working directory
+cfg.bidsroot = dir_bidsdata;  % write to the BIDS directory
 
 
 % get subject name
 subject = strsplit(xdfFiles.name, '_');
 subject = [subject{2},subject{3}];
+cfg.sub = subject;
     
 % 5. enter eeg metadata and feed to data2bids function
 %--------------------------------------------------------------------------
@@ -100,12 +101,11 @@ data2bids(cfg, EMGftData);
 %% MoCap data
 
 % prepare mocap data
-mocap.trial{1} = [data.L_heel, data.R_heel, data.pelvis]';
-mocap.label = {'LeftHeelPosX','LeftHeelPosY','LeftHeelPosZ',...
+mocap = prep_omc_bids(MotionftData);
+mocap.label = {'PelvisPosX','PelvisPosY','PelvisPosZ',...
+                'LeftHeelPosX','LeftHeelPosY','LeftHeelPosZ',...
                 'RightHeelPosX','RightHeelPosY','RightHeelPosZ',...
-                'PelvisPosX','PelvisPosY','PelvisPosZ',...
                 }';
-mocap.time{1} = data.t_qls;
 
 mocap = ft_datatype_raw(mocap);
 
@@ -113,27 +113,30 @@ mocap = ft_datatype_raw(mocap);
 cfg.tracksys                    = 'qualisys';
 cfg.motion.TrackingSystemName   = 'qualisys';
 cfg.motion.SpatialAxes          = 'BRU';
-cfg.motion.samplingrate         = data.fs_qls;
+cfg.motion.samplingrate         = 100;
 
 % specify channel details, this overrides the details in the original data structure
 cfg.channels = [];
 cfg.channels.name = mocap.label;
+cfg.channels.component = {'x' , 'y', 'z', ...
+                         'x' , 'y', 'z', ...
+                         'x' , 'y', 'z'};
 cfg.channels.type = cellstr(repmat('POS',length(mocap.label),1));
-cfg.channels.units = cellstr(repmat('mm',length(mocap.label),1))
+cfg.channels.units = cellstr(repmat('mm',length(mocap.label),1));
 
 cfg.channels.tracked_point = {
-  'left_heel',
-  'left_heel',
-  'left_heel',
-  'right_heel',
-  'right_heel',
-  'right_heel',
   'pelvis',
   'pelvis',
-  'pelvis'
+  'pelvis'  
+  'left_heel',
+  'left_heel',
+  'left_heel',
+  'right_heel',
+  'right_heel',
+  'right_heel',
   };
 
 cfg.datatype = 'motion';
-data2bids(cfg, MotionftData);
+data2bids(cfg, mocap);
 
 
