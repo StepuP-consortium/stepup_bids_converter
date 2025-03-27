@@ -5,6 +5,9 @@ description = "This repo holds scripts to convert data to BIDS"
 authors = ["Julius Welzel <julius.welzel@gmail.com>"]
 license = "MIT"
 readme = "README.md"
+packages = [
+    { include = "utils" },
+]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
@@ -14,6 +17,8 @@ mnelab = "^0.9.0"
 pylsl = "^1.16.2"
 pandas = "^2.2.2"
 pybids = "^0.16.4"
+ipykernel = "^6.29.5"
+mne-bids = "^0.16.0"
 
 
 [build-system]
