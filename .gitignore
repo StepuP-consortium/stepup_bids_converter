@@ -1,3 +1,4 @@
 data/source
 data/bids
 *.asv
+__pycache__
