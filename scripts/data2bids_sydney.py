@@ -7,7 +7,7 @@ from pathlib import Path
 import pyxdf
 
 from utils.motionbids import generate_channels_tsv, generate_motion_json_file
-from utils.config import dir_bids_root
+from utils.config import DIR_BIDS_ROOT
 
 # load data
 file_path = Path(r"C:\Users\juliu\Desktop\kiel\stepup_bids_converter\data\source\PILOT _OLI_17062025")  # Replace with your XDF file path)
@@ -46,7 +46,7 @@ raw.info['line_freq'] = 50  # specify power line frequency as required by BIDS
 
 # delete events if they start before eeg recording
 events = mne.events_from_annotations(raw)
-bids_path = BIDSPath(subject=subject_id, task=task, datatype='eeg', root=dir_bids_root)
+bids_path = BIDSPath(subject=subject_id, task=task, datatype='eeg', root=DIR_BIDS_ROOT)
 write_raw_bids(raw, bids_path, overwrite=True, allow_preload=True, format='BrainVision', verbose=True)
 
 print(f'Finished writing BIDS for participant {subject_id} and task {task}')
@@ -58,7 +58,7 @@ raw_eeg = mne.io.RawArray(eeg_stream['time_series'].T, mne.create_info(ch_names=
 # Set the first channel as the time channel
 raw_eeg.set_channel_types({raw_eeg.ch_names[0]: 'time'})
 # Save the EEG data to BIDS format
-bids_path_eeg = BIDSPath(subject='TestBologna', session='T1', task='FixSpeed', datatype='eeg', root=dir_bids_root).mkdir()
+bids_path_eeg = BIDSPath(subject='TestBologna', session='T1', task='FixSpeed', datatype='eeg', root=DIR_BIDS_ROOT).mkdir()
 raw_eeg.save(bids_path_eeg.copy().update(suffix='eeg', extension='.fif'), overwrite=True)
 
 # find Mocap stream
@@ -146,9 +146,9 @@ for frame in sorted(df["frame"].unique()):
 TRACKSYS = 'Qualisys'
 
 # Create a dataset description
-make_dataset_description(path=dir_bids_root, name='StepUp')
+make_dataset_description(path=DIR_BIDS_ROOT, name='StepUp')
 
-bids_path = BIDSPath(subject='TestBologna', session='T1', task='FixSpeed', datatype='motion', root=dir_bids_root).mkdir()
+bids_path = BIDSPath(subject='TestBologna', session='T1', task='FixSpeed', datatype='motion', root=DIR_BIDS_ROOT).mkdir()
 
 # write channels.tsv to path
 channels = generate_channels_tsv(["Pelvis", "LeftFoot", "RightFoot"])

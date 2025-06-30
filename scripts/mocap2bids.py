@@ -5,7 +5,7 @@ from pathlib import Path
 import pyxdf
 
 from utils.motionbids import generate_channels_tsv, generate_motion_json_file
-from utils.config import dir_bids_root
+from utils.config import DIR_BIDS_ROOT
 
 # load data
 file_path = r"C:\Users\juliu\Desktop\kiel\stepup_setup_jw\data\Test_bologna_25_03_25\4_WALKING_14\sub-P001_ses-S001_task-Default_run-001_eeg_old6.xdf"  # Replace with your XDF file path
@@ -110,9 +110,9 @@ for frame in sorted(df["frame"].unique()):
 TRACKSYS = 'Qualisys'
 
 # Create a dataset description
-make_dataset_description(path=dir_bids_root, name='StepUp')
+make_dataset_description(path=DIR_BIDS_ROOT, name='StepUp')
 
-bids_path = BIDSPath(subject='TestBologna', session='T1', task='FixSpeed', datatype='motion', root=dir_bids_root).mkdir()
+bids_path = BIDSPath(subject='TestBologna', session='T1', task='FixSpeed', datatype='motion', root=DIR_BIDS_ROOT).mkdir()
 
 # write channels.tsv to path
 channels = generate_channels_tsv(["Pelvis", "LeftFoot", "RightFoot"])
