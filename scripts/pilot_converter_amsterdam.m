@@ -3,11 +3,11 @@ clc; clear all;
 
 %% load data
 dir_project= fullfile('C:\Users\juliu\Desktop\kiel\stepup_bids_converter');
-dir_sourcedata = fullfile(dir_project, 'data', 'source');
+dir_sourcedata = fullfile('C:\Users\juliu\Desktop\kiel\stepup_bids_converter\data\source');
 dir_bidsdata = fullfile(dir_project, 'data', 'bids');
 
 % add fieltrip
-addpath('C:\Users\juliu\Documents\MATLAB\fieldtrip-20240129')
+addpath('C:\Users\juliu\Desktop\fieldtrip')
 ft_defaults
 
 %% set cfg for BIDS conversion
@@ -42,6 +42,7 @@ for i = 1:length(datasets)
     %% EEG data
     % bids relevant  modality agnostic specs
     cfg.sub = ['AMS' subject];
+    cfg.task = 'treadmill'
 
     % retrieve EEG data
     eeg = data.data_EEG;
@@ -53,7 +54,6 @@ for i = 1:length(datasets)
     % convert eeg 2 bids
     cfg.eeg.PowerLineFrequency = 50;   % since recorded in the EU
     cfg.eeg.EEGReference       = 'CAR'; % actually I do not know, but let's assume
-    cfg.datatype  = 'eeg';
     eeg.cfg.event = [];
     data2bids(cfg, eeg);
 
@@ -83,7 +83,7 @@ for i = 1:length(datasets)
     % bids relevant mocap
     cfg.tracksys                    = 'qualisys';
     cfg.motion.TrackingSystemName   = 'qualisys';
-    cfg.motion.SpatialAxes          = 'FRU';
+    cfg.motion.SpatialAxes          = 'RFU';
     cfg.motion.samplingrate         = data.fs_qls;
 
     % specify channel details, this overrides the details in the original data structure
@@ -110,5 +110,5 @@ for i = 1:length(datasets)
     cfg.datatype = 'motion';
     data2bids(cfg, mocap);
 
-    
+
 end
