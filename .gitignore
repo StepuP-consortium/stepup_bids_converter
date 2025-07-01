@@ -2,3 +2,4 @@ data/source
 data/bids
 *.asv
 __pycache__
+poetry.lock
