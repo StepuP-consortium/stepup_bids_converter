@@ -20,6 +20,7 @@ pybids = "^0.16.4"
 ipykernel = "^6.29.5"
 mne-bids = "^0.16.0"
 pybv = "^0.7.6"
+defusedxml = "^0.7.1"
 
 
 [build-system]
