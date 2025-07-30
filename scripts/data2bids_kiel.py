@@ -10,13 +10,14 @@ import pyxdf
 from utils.motionbids import generate_channels_tsv, generate_motion_json_file
 from utils.config import DIR_BIDS_ROOT, DIR_PROJ
 from utils.plotting import plot_marker_events
+from utils.clustering import merge_marker_fragments
 
 ##################################
 # Create a dataset description
 ##################################
 # This is a required step for BIDS datasets
 # It creates a dataset_description.json file in the BIDS root directory
-make_dataset_description(path=DIR_BIDS_ROOT, name='StepUp_Sydney')
+make_dataset_description(path=DIR_BIDS_ROOT, name='StepUp_Kiel')
 
 
 
@@ -155,6 +156,8 @@ for marker_id in unique_marker_ids:
 #ax.set_xlim([0, 10])
 #ax.set_ylim([393.8, 394.2])
 
+# Example usage:
+merged_markers = merge_marker_fragments(marker_data_dict, n_expected_markers=5)
 
 # create bids dataset
 TRACKSYS = 'Qualisys'  # Track system used for motion capture

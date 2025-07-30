@@ -78,6 +78,7 @@ cfg.bidsroot = dir_bidsdata;  % write to the BIDS directory
 subject = strsplit(xdfFiles.name, '_');
 subject = [subject{2},subject{3}];
 cfg.sub = subject;
+cfg.task = 'ComfSpeed';
 
 % add participant information
 cfg.participants.age = 58;

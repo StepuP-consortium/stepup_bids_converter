@@ -60,16 +60,6 @@ print(f'Finished writing EEG BIDS for participant {subject_id} and task {task}')
 
 
 
-
-
-
-
-
-
-
-
-
-
 # find Mocap stream
 # load EEG stream into MNE and export to BIDS
 data_stream = [s for s in streams if s['info']['type'][0] == 'MoCap'][0]
@@ -78,11 +68,21 @@ data_stream_id = data_stream['info']['stream_id']
 data_lsl_times = data_stream['time_stamps'] - data_stream['time_stamps'][0]
 data_raw = data_stream['time_series']
 
+# <Column A>Timestamps
+# <Colum B(0)>FrameNumbers
+# <Colum (1)C>Frame rate
+# <Colum D(2)>Total Time that the loop has taken for capturing the data from Vicon(It's just for our understanding, don't worry about it)
+# <Colum E(3)-CF(82)>Vicon Data<Colum 
+# BM(63)-BT(70)>Left Foot and Right Foot(Extra Markers)
+# <Colum BU(71)-CF(82)>Unlabeled Markers>
+# <Colum CG(83)-AAV(722)EMG Data>We used only two sensors, that 'why all other columns are zero
+# <Colum AAW(723)-AHV(904)>Force Plates Data
+
 # extract mocap marker data
 mocap_times = data_raw[:,0]
 frames_mocap = data_raw[:,1]
 vicon_data = data_raw[:,3:83]
-emg_data = data_raw[:,83:723]
+emg_data = data_raw[:,82:723]
 
 
 # create bids dataset
@@ -93,6 +93,7 @@ SRATE_MOCAP = float(data_stream['info']['nominal_srate'][0])  # Sampling frequen
 make_dataset_description(path=DIR_BIDS_ROOT, name='StepUp_Sydney')
 
 bids_path = BIDSPath(subject=subject_id, task=task, session=session, datatype='motion', root=DIR_BIDS_ROOT)
+bids_path.mkdir()
 
 # write channels.tsv to path
 channels = generate_channels_tsv(["Pelvis", "LeftFoot", "RightFoot"])
@@ -112,9 +113,9 @@ with open(Path(motion_json_file), 'w') as f:
     
 # write raw data as tsv
 # make vstack in order pelvis, left foot, right foot
-pelvis = vicon_data
-left_foot = vicon_data
-right_foot = vicon_data
+pelvis = vicon_data[:, 0:3]  # Assuming pelvis markers are in columns 0-5
+left_foot = vicon_data[:, 60:63]  # Assuming left foot markers are in columns 60-63
+right_foot = vicon_data[:, 64:67]  # Assuming right foot markers are in columns 64-67
 
 raw_data = np.vstack([pelvis, left_foot, right_foot]).T
 #remove singleton dimension
@@ -128,3 +129,28 @@ raw_data_tsv = raw_data_tsv.split('_motion')
 raw_data_tsv = raw_data_tsv[0] + '_tracksys-' + TRACKSYS + '_motion' + raw_data_tsv[1]
 
 np.savetxt(raw_data_tsv, raw_data, delimiter='\t', header='', comments='')
+
+# find EMG stream
+fixed_emg_mapping = {
+    'Sensor 1': [1, 'BfEmgR'],
+    'Sensor 2': [2, 'BfEmgL'],
+    'Sensor 3': [3, 'RfEmgR'],
+    'Sensor 4': [4, 'RfEmgL'],
+    'Sensor 5': [5, 'GaEmgR'],
+    'Sensor 6': [6, 'GaEmgL'],
+    'Sensor 7': [7, 'GmEmgR'],
+    'Sensor 8': [8, 'GmEmgL'],
+    'Sensor 9': [9, 'TaEmgR'],
+    'Sensor 10': [10, 'TaEmgL'],
+}
+
+emg_data_BfEmgR = emg_data[:, 21:41]
+emg_data_BfEmgL = emg_data[:, 43:62]
+emg_data_RfEmgR = emg_data[:, 64:83]
+emg_data_RfEmgL = emg_data[:, 85:104]
+emg_data_GaEmgR = emg_data[:, 106:125]
+emg_data_GaEmgL = emg_data[:, 127:146]
+emg_data_GmEmgR = emg_data[:, 148:167]
+emg_data_GmEmgL = emg_data[:, 169:188]
+emg_data_TaEmgR = emg_data[:, 190:209]
+emg_data_TaEmgL = emg_data[:, 211:230]
