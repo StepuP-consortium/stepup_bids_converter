@@ -130,27 +130,35 @@ raw_data_tsv = raw_data_tsv[0] + '_tracksys-' + TRACKSYS + '_motion' + raw_data_
 
 np.savetxt(raw_data_tsv, raw_data, delimiter='\t', header='', comments='')
 
-# find EMG stream
-fixed_emg_mapping = {
-    'Sensor 1': [1, 'BfEmgR'],
-    'Sensor 2': [2, 'BfEmgL'],
-    'Sensor 3': [3, 'RfEmgR'],
-    'Sensor 4': [4, 'RfEmgL'],
-    'Sensor 5': [5, 'GaEmgR'],
-    'Sensor 6': [6, 'GaEmgL'],
-    'Sensor 7': [7, 'GmEmgR'],
-    'Sensor 8': [8, 'GmEmgL'],
-    'Sensor 9': [9, 'TaEmgR'],
-    'Sensor 10': [10, 'TaEmgL'],
+# find EMG stream and dynamically extract sensor data
+sensor_names = [
+    'BfEmgR', 'BfEmgL', 'RfEmgR', 'RfEmgL',
+    'GaEmgR', 'GaEmgL', 'GmEmgR', 'GmEmgL',
+    'TaEmgR', 'TaEmgL'
+]
+
+# Define the start and end indices for each sensor (update as needed)
+sensor_indices = {
+    'BfEmgR': (22, 41),
+    'BfEmgL': (43, 62),
+    'RfEmgR': (64, 83),
+    'RfEmgL': (85, 104),
+    'GaEmgR': (106, 125),
+    'GaEmgL': (127, 146),
+    'GmEmgR': (148, 167),
+    'GmEmgL': (169, 188),
+    'TaEmgR': (190, 209),
+    'TaEmgL': (211, 230),
 }
 
-emg_data_BfEmgR = emg_data[:, 21:41]
-emg_data_BfEmgL = emg_data[:, 43:62]
-emg_data_RfEmgR = emg_data[:, 64:83]
-emg_data_RfEmgL = emg_data[:, 85:104]
-emg_data_GaEmgR = emg_data[:, 106:125]
-emg_data_GaEmgL = emg_data[:, 127:146]
-emg_data_GmEmgR = emg_data[:, 148:167]
-emg_data_GmEmgL = emg_data[:, 169:188]
-emg_data_TaEmgR = emg_data[:, 190:209]
-emg_data_TaEmgL = emg_data[:, 211:230]
+emg_dict = {}
+for name in sensor_names:
+    start, end = sensor_indices[name]
+    emg_dict[name] = emg_data[:, start:end].ravel(order='F')
+
+# Merge all sensor data into a 2D array (samples x sensors)
+emg_2d = np.column_stack([emg_dict[name] for name in sensor_names])
+
+# write data to BIDS
+bids_path = BIDSPath(subject=subject_id, task=task, session=session, datatype='emg', root=DIR_BIDS_ROOT)
+bids_path.mkdir()
