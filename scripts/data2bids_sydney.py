@@ -4,13 +4,14 @@ from mnelab.io.xdf import read_raw_xdf
 import mne
 import numpy as np
 from pathlib import Path
+import pandas as pd
 import pyxdf
 
 from utils.motionbids import generate_channels_tsv, generate_motion_json_file
-from utils.config import DIR_BIDS_ROOT
+from utils.config import DIR_BIDS_ROOT, DIR_PROJ
 
 # load data
-file_path = Path(r"C:\Users\User\Desktop\kiel\stepup\stepup_bids_converter\data\source\PILOT _OLI_17062025")  # Replace with your XDF file path)
+file_path = Path(DIR_PROJ.joinpath('data\source\PILOT _OLI_17062025'))  # Replace with your XDF file path)
 
 # find all xdf files which include the string walk in the filename in the directory and print them each file name
 xdf_files = list(file_path.glob('*Walk*.xdf'))
@@ -40,6 +41,11 @@ subject_id = fname.split('_')[0]  # Extract subject ID from filename
 task = fname.split('_')[2]  # Extract task from filename
 session = fname.split('_')[1]  # Extract visit from filename
 
+############################################
+#
+#                   EEG
+#
+############################################
 # load EEG stream into MNE and export to BIDS
 eeg_stream = [s for s in streams if s['info']['type'][0] == 'EEG'][0]
 eeg_stream_id = eeg_stream['info']['stream_id']
@@ -60,7 +66,11 @@ write_raw_bids(raw, bids_path, overwrite=True, allow_preload=True, format='Brain
 print(f'Finished writing EEG BIDS for participant {subject_id} and task {task}')
 
 
-
+############################################
+#
+#                   MoCap
+#
+############################################
 # find Mocap stream
 # load EEG stream into MNE and export to BIDS
 data_stream = [s for s in streams if s['info']['type'][0] == 'MoCap'][0]
@@ -98,11 +108,11 @@ bids_path.datatype = 'motion'
 bids_path.mkdir()
 
 # write channels.tsv to path
-channels = generate_channels_tsv(["Pelvis", "LeftFoot", "RightFoot"])
-channels_tsv = bids_path.copy().update(suffix='channels', extension='.tsv')
-channels_tsv = str(channels_tsv).split('_channels')
-channels_tsv = channels_tsv[0] + '_tracksys-' + TRACKSYS + '_channels' + channels_tsv[1]
-channels.to_csv(channels_tsv, sep='\t', index=False)
+motion_channels = generate_channels_tsv(["Pelvis", "LeftFoot", "RightFoot"])
+motion_channels_tsv = bids_path.copy().update(suffix='channels', extension='.tsv')
+motion_channels_tsv = str(motion_channels_tsv).split('_channels')
+motion_channels_tsv = motion_channels_tsv[0] + '_tracksys-' + TRACKSYS + '_channels' + motion_channels_tsv[1]
+motion_channels.to_csv(motion_channels_tsv, sep='\t', index=False)
 
 # write motion.json to path
 motion_fields = dict(TaskName=task, SamplingFrequency=SRATE_MOCAP)
@@ -119,9 +129,7 @@ pelvis = vicon_data[:, 0:3]  # Assuming pelvis markers are in columns 0-5
 left_foot = vicon_data[:, 60:63]  # Assuming left foot markers are in columns 60-63
 right_foot = vicon_data[:, 64:67]  # Assuming right foot markers are in columns 64-67
 
-raw_data = np.vstack([pelvis, left_foot, right_foot]).T
-#remove singleton dimension
-raw_data = np.squeeze(raw_data)
+motion_data = np.hstack([pelvis, left_foot, right_foot]).squeeze()
 
 #store as tsv without headers
 raw_data_tsv = str(bids_path.copy().update(suffix='motion', extension='.tsv'))
@@ -130,10 +138,15 @@ raw_data_tsv = str(bids_path.copy().update(suffix='motion', extension='.tsv'))
 raw_data_tsv = raw_data_tsv.split('_motion')
 raw_data_tsv = raw_data_tsv[0] + '_tracksys-' + TRACKSYS + '_motion' + raw_data_tsv[1]
 
-np.savetxt(raw_data_tsv, raw_data, delimiter='\t', header='', comments='')
+np.savetxt(raw_data_tsv, motion_data, delimiter='\t', header='', comments='')
 
+############################################
+#
+#                   EMG
+#
+############################################
 # find EMG stream and dynamically extract sensor data
-sensor_names = [
+emg_sensor_names = [
     'BfEmgR', 'BfEmgL', 'RfEmgR', 'RfEmgL',
     'GaEmgR', 'GaEmgL', 'GmEmgR', 'GmEmgL',
     'TaEmgR', 'TaEmgL'
@@ -154,14 +167,29 @@ sensor_indices = {
 }
 
 emg_dict = {}
-for name in sensor_names:
+for name in emg_sensor_names:
     start, end = sensor_indices[name]
     emg_dict[name] = emg_data[:, start:end].ravel(order='F')
 
 # Merge all sensor data into a 2D array (samples x sensors)
-emg_2d = np.column_stack([emg_dict[name] for name in sensor_names])
+emg_data_bids = np.column_stack([emg_dict[name] for name in emg_sensor_names])
+
+# create channels.tsv for emg
+emg_channels = pd.DataFrame(dict(name=emg_sensor_names, type=['EMG']*len(emg_sensor_names), units=['V']*len(emg_sensor_names)))
 
 # write data to BIDS
 bids_path = BIDSPath(subject=subject_id, task=task, session=session, datatype='eeg', root=DIR_BIDS_ROOT)
 bids_path.datatype = 'emg'
 bids_path.mkdir()
+
+# write emg as tsv
+emg_tsv = str(bids_path.copy().update(suffix='emg', extension='.tsv'))
+emg_tsv = emg_tsv.split('_emg')
+emg_tsv = emg_tsv[0] + '_emg' + emg_tsv[1]
+np.savetxt(emg_tsv, emg_data_bids, delimiter='\t', header='', comments='')
+
+# write emg_channels.tsv
+channels_tsv = bids_path.copy().update(suffix='channels', extension='.tsv')
+channels_tsv = str(channels_tsv).split('_channels')
+channels_tsv = channels_tsv[0] + '_channels' + channels_tsv[1]
+emg_channels.to_csv(channels_tsv, sep='\t', index=False)
