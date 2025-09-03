@@ -10,7 +10,7 @@ from utils.motionbids import generate_channels_tsv, generate_motion_json_file
 from utils.config import DIR_BIDS_ROOT
 
 # load data
-file_path = Path(r"C:\Users\juliu\Desktop\kiel\stepup_bids_converter\data\source\PILOT _OLI_17062025")  # Replace with your XDF file path)
+file_path = Path(r"C:\Users\User\Desktop\kiel\stepup\stepup_bids_converter\data\source\PILOT _OLI_17062025")  # Replace with your XDF file path)
 
 # find all xdf files which include the string walk in the filename in the directory and print them each file name
 xdf_files = list(file_path.glob('*Walk*.xdf'))
@@ -19,6 +19,7 @@ if not xdf_files:
 else:
     for xdf_file in xdf_files:
         print(f"Found XDF file: {xdf_file.name}")
+        
 
 # load the first xdf file
 streams, fileheader = pyxdf.load_xdf(xdf_files[0], handle_clock_resets=False)
