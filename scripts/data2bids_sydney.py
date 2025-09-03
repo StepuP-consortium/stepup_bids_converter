@@ -92,7 +92,8 @@ SRATE_MOCAP = float(data_stream['info']['nominal_srate'][0])  # Sampling frequen
 # Create a dataset description
 make_dataset_description(path=DIR_BIDS_ROOT, name='StepUp_Sydney')
 
-bids_path = BIDSPath(subject=subject_id, task=task, session=session, datatype='motion', root=DIR_BIDS_ROOT)
+bids_path = BIDSPath(subject=subject_id, task=task, session=session, datatype='eeg', root=DIR_BIDS_ROOT)
+bids_path.datatype = 'motion'
 bids_path.mkdir()
 
 # write channels.tsv to path
@@ -160,5 +161,6 @@ for name in sensor_names:
 emg_2d = np.column_stack([emg_dict[name] for name in sensor_names])
 
 # write data to BIDS
-bids_path = BIDSPath(subject=subject_id, task=task, session=session, datatype='emg', root=DIR_BIDS_ROOT)
+bids_path = BIDSPath(subject=subject_id, task=task, session=session, datatype='eeg', root=DIR_BIDS_ROOT)
+bids_path.datatype = 'emg'
 bids_path.mkdir()
