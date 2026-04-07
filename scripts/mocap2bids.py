@@ -4,8 +4,8 @@ import numpy as np
 from pathlib import Path
 import pyxdf
 
-from utils.motionbids import generate_channels_tsv, generate_motion_json_file
-from utils.config import DIR_BIDS_ROOT
+from src.motionbids import generate_channels_tsv, generate_motion_json_file
+from src.config import DIR_BIDS_ROOT
 
 # load data
 file_path = r"C:\Users\juliu\Desktop\kiel\stepup_setup_jw\data\Test_bologna_25_03_25\4_WALKING_14\sub-P001_ses-S001_task-Default_run-001_eeg_old6.xdf"  # Replace with your XDF file path

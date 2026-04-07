@@ -7,8 +7,8 @@ from pathlib import Path
 import pandas as pd
 import pyxdf
 
-from utils.motionbids import generate_channels_tsv, generate_motion_json_file
-from utils.config import DIR_BIDS_ROOT, DIR_PROJ
+from src.motionbids import generate_channels_tsv, generate_motion_json_file
+from src.config import DIR_BIDS_ROOT, DIR_PROJ
 
 # load data
 file_path = Path(DIR_PROJ.joinpath('data\source\PILOT _OLI_17062025'))  # Replace with your XDF file path)

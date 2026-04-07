@@ -21,7 +21,10 @@ def plot_marker_events(marker_data_dict, show=True):
     handles, labels = [], []
 
     for idx, marker_id in enumerate(marker_ids):
-        indices = marker_data_dict[marker_id]["indices"][0]
+        indices = marker_data_dict[marker_id]["indices"]
+        # Handle both tuple from np.where() and already-flattened array
+        if isinstance(indices, tuple):
+            indices = indices[0]
         y = np.full_like(indices, idx + 1)
         color = colors[idx % len(colors)]
         h = ax.plot(indices, y, ".", color=color, label=f"Marker {marker_id} (N={len(indices)})")[0]

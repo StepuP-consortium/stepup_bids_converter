@@ -2,9 +2,9 @@
 clc; clear all; 
 
 %% Get the full path of the current script and set directory names
-dir_project= fullfile('C:\Users\juliu\Desktop\kiel\stepup_bids_converter');
+dir_project= fullfile('C:\Users\juliu\Nextcloud\Talks\imove_bids_handson');
 dir_sourcedata = fullfile(dir_project, 'data', 'source');
-dir_bidsdata = fullfile(dir_project, 'data', 'bids');
+dir_bidsdata = fullfile(dir_project, 'data', 'bids_fieldtrip');
 
 % add fieltrip
 addpath('C:\Users\juliu\Documents\MATLAB\fieldtrip-20240129')

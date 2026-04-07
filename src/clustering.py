@@ -331,3 +331,141 @@ def merge_marker_fragments(marker_dict, n_expected_markers,
 
 # Example usage:
 # merged_markers = merge_marker_fragments(marker_dict, n_expected_markers=5)
+
+
+import numpy as np
+from collections import Counter, defaultdict
+from scipy.spatial.distance import cdist
+
+def cluster_markers_temporal(data, timestamps, n_markers=5, max_gap_samples=10, distance_threshold=50):
+    """
+    Cluster markers considering both spatial position and temporal continuity.
+    
+    Parameters:
+    -----------
+    data : array (n_samples, 4) - [x, y, z, marker_id]
+    timestamps : array (n_samples,) - time for each sample
+    n_markers : int - expected number of physical markers
+    max_gap_samples : int - max samples to look back for linking
+    distance_threshold : float - max distance (mm) to consider same marker
+    """
+    marker_ids = data[:, 3]
+    unique_ids = np.unique(marker_ids)
+    
+    # OPTIMIZED: Build time series using vectorized operations instead of loop
+    # Group indices by marker ID using numpy operations
+    sort_idx = np.argsort(marker_ids)
+    sorted_ids = marker_ids[sort_idx]
+    sorted_data = data[sort_idx]
+    sorted_timestamps = timestamps[sort_idx]
+    sorted_original_idx = np.arange(len(data))[sort_idx]
+    
+    # Find split points between different marker IDs
+    split_points = np.where(np.diff(sorted_ids) != 0)[0] + 1
+    split_points = np.concatenate([[0], split_points, [len(sorted_ids)]])
+    
+    # Build optimized data structures
+    id_timeseries = {}  # {mid: {'indices': array, 'timestamps': array, 'positions': array}}
+    id_ranges = {}
+    
+    for i in range(len(split_points) - 1):
+        start, end = split_points[i], split_points[i + 1]
+        mid = sorted_ids[start]
+        
+        indices = sorted_original_idx[start:end]
+        ts = sorted_timestamps[start:end]
+        positions = sorted_data[start:end, :3]
+        
+        # Sort by original index within this marker
+        inner_sort = np.argsort(indices)
+        indices = indices[inner_sort]
+        ts = ts[inner_sort]
+        positions = positions[inner_sort]
+        
+        id_timeseries[mid] = {
+            'indices': indices,
+            'timestamps': ts,
+            'positions': positions
+        }
+        id_ranges[mid] = (indices[0], indices[-1], len(indices))
+    
+    print("Marker ID temporal ranges:")
+    for mid in sorted(id_ranges.keys(), key=lambda x: id_ranges[x][0]):
+        start, end, count = id_ranges[mid]
+        print(f"  ID {int(mid):5d}: samples {start:6d} - {end:6d}, count: {count}")
+    
+    # Build a graph of ID transitions based on temporal proximity and spatial closeness
+    # An edge exists if one ID disappears and another appears nearby in space/time
+    transitions = []
+    
+    # OPTIMIZED: Use vectorized access for transition detection
+    for id1 in unique_ids:
+        ts1 = id_timeseries[id1]
+        last_idx1 = ts1['indices'][-1]
+        last_pos1 = ts1['positions'][-1]
+        
+        for id2 in unique_ids:
+            if id1 == id2:
+                continue
+            ts2 = id_timeseries[id2]
+            first_idx2 = ts2['indices'][0]
+            first_pos2 = ts2['positions'][0]
+            
+            # Check if id2 appears shortly after id1 disappears
+            idx_gap = first_idx2 - last_idx1
+            if 0 < idx_gap <= max_gap_samples:
+                # Check spatial distance
+                dist = np.linalg.norm(last_pos1 - first_pos2)
+                if dist < distance_threshold:
+                    transitions.append((id1, id2, idx_gap, dist))
+                    print(f"  Potential link: {int(id1)} -> {int(id2)} (gap: {idx_gap}, dist: {dist:.1f}mm)")
+    
+    # Use Union-Find to group connected marker IDs
+    parent = {mid: mid for mid in unique_ids}
+    
+    def find(x):
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+    
+    def union(x, y):
+        px, py = find(x), find(y)
+        if px != py:
+            parent[px] = py
+    
+    # Apply transitions to union-find
+    for id1, id2, gap, dist in transitions:
+        union(id1, id2)
+    
+    # Group IDs by their root
+    clusters = defaultdict(list)
+    for mid in unique_ids:
+        root = find(mid)
+        clusters[root].append(mid)
+    
+    # For each cluster, pick canonical ID (most frequent)
+    id_mapping = {}
+    print(f"\n{len(clusters)} clusters found:")
+    for i, (root, members) in enumerate(clusters.items()):
+        counts = {mid: len(id_timeseries[mid]['indices']) for mid in members}
+        canonical = max(counts, key=counts.get)
+        total_samples = sum(counts.values())
+        
+        print(f"\nCluster {i} -> Canonical ID {int(canonical)} ({total_samples} total samples):")
+        for mid in sorted(members):
+            start, end, count = id_ranges[mid]
+            print(f"  ID {int(mid):5d}: {count:6d} samples (idx {start}-{end})")
+        
+        for mid in members:
+            id_mapping[mid] = canonical
+    
+    # OPTIMIZED: Apply mapping using vectorized operations
+    new_data = data.copy()
+    for old_id, new_id in id_mapping.items():
+        if old_id != new_id:
+            mask = marker_ids == old_id
+            new_data[mask, 3] = new_id
+    
+    return new_data, id_mapping, clusters
+
+

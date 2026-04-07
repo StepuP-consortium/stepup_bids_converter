@@ -6,13 +6,12 @@ import mne
 import numpy as np
 from pathlib import Path
 import pyxdf
+from collections import Counter
 
-from utils.motionbids import generate_channels_tsv, generate_motion_json_file
-from utils.config import DIR_BIDS_ROOT, DIR_PROJ
-from utils.plotting import plot_marker_events
-from utils.clustering import merge_marker_fragments
-
-
+from src.motionbids import generate_channels_tsv, generate_motion_json_file
+from src.config import DIR_BIDS_ROOT, DIR_PROJ
+from src.plotting import plot_marker_events
+from src.clustering import merge_marker_fragments, cluster_markers_temporal
 
 # load data
 file_path = Path(r"C:\Users\juliu\Desktop\kiel\stepup_bids_converter\data\source")  # Replace with your XDF file path)
@@ -53,7 +52,8 @@ session = fname.split('_')[3]  # Extract visit from filename
 # Mocap 2 BIDS
 ####################################
 # create bids path for motion capture data
-bids_path_motion = BIDSPath(subject=subject_id, task=task, session=session, datatype='motion', root=DIR_BIDS_ROOT)
+bids_path_motion = BIDSPath(subject=subject_id, task=task, session=session, datatype='eeg', root=DIR_BIDS_ROOT)
+bids_path_motion = Path(str(bids_path_motion).replace('eeg', 'motion'))
 
 # find Mocap stream
 mocap_stream = [s for s in streams if s['info']['type'][0] == '6D'][0]
@@ -61,6 +61,17 @@ mocap_stream = [s for s in streams if s['info']['type'][0] == '6D'][0]
 mocap_times = mocap_stream['time_stamps'] - mocap_stream['time_stamps'][0]
 mocap_raw = mocap_stream['time_series']
 
+# Usage - assuming you have timestamps from LSL
+merged_data, mapping, clusters = cluster_markers_temporal(
+    mocap_raw, 
+    mocap_times, 
+    n_markers=5,
+    max_gap_samples=50,      # adjust based on your sampling rate
+    distance_threshold=100   # adjust based on marker movement speed (mm)
+)
+
+print("\nAfter merging:")
+print(Counter(merged_data[:, 3]))
 
 # print unique marker ids, and number of occurences per makrer id
 marker_ids = mocap_raw[:,3]
@@ -137,4 +148,3 @@ for marker_id, info in marker_data_dict.items():
 # create bids dataset
 TRACKSYS = 'Qualisys'  # Track system used for motion capture
 SRATE_MOCAP = float(mocap_stream['info']['nominal_srate'][0])  # Sampling frequency for motion capture data
-

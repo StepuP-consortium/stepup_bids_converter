@@ -3,7 +3,7 @@ from mnelab.io.xdf import read_raw_xdf
 import pandas as pd
 import pyxdf
 
-from utils.xdf import get_effective_srate_xdf
+from src.xdf import get_effective_srate_xdf
 
 
 def get_info_emg_files(data_dir):

@@ -8,10 +8,10 @@ from pathlib import Path
 import pyxdf
 import os
 
-from utils.motionbids import generate_channels_tsv, generate_motion_json_file
-from utils.config import DIR_BIDS_ROOT, DIR_PROJ
-from utils.plotting import plot_marker_events
-from utils.clustering import merge_marker_fragments
+from src.motionbids import generate_channels_tsv, generate_motion_json_file
+from src.config import DIR_BIDS_ROOT, DIR_PROJ
+from src.plotting import plot_marker_events
+from src.clustering import merge_marker_fragments
 
 ##################################
 # Create a dataset description

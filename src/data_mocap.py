@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pyxdf
 
-from utils.xdf import get_stream
+from src.xdf import get_stream
 
 # find all xdf files in the directory
 def get_info_mocap_files(data_dir):
