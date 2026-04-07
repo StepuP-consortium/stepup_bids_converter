@@ -3,5 +3,6 @@ data/bids
 *.asv
 __pycache__
 
-poetry.lock
-/poetry.lock    
+# uv enviroment
+uv.lock
+.venv
