@@ -1,6 +1,6 @@
 import json
 import matplotlib.pyplot as plt
-from mne_bids import make_dataset_description, write_raw_bids, BIDSPath
+from mne_bids import make_dataset_description, write_raw_bids, update_sidecar_json, BIDSPath
 from mnelab.io.xdf import read_raw_xdf
 import mne
 import numpy as np
@@ -11,6 +11,7 @@ from src.motionbids import generate_channels_tsv, generate_motion_json_file
 from src.config import DIR_BIDS_ROOT, DIR_PROJ
 from src.plotting import plot_marker_events
 from src.clustering import merge_marker_fragments
+from src.xdf import get_effective_srate_xdf
 
 ##################################
 # Create a dataset description
@@ -28,8 +29,8 @@ make_dataset_description(path=DIR_BIDS_ROOT, name='StepUp_Kiel')
 # load data
 file_path = Path(r"C:\Users\juliu\Desktop\kiel\stepup_bids_converter\data\source")  # Replace with your XDF file path)
 
-# find all xdf files which include the string walk in the filename in the directory and print them each file name
-xdf_files = list(file_path.glob('*DEU*.xdf'))
+# find all DEU .xdf files in the Kiel subject folders (source/Kiel*/.../*DEU*.xdf)
+xdf_files = list(file_path.glob('Kiel*/**/*DEU*.xdf'))
 if not xdf_files:
     print("No XDF files found in the directory.")
 else:
@@ -74,6 +75,82 @@ bids_path_eeg = BIDSPath(subject=subject_id, task=task, session=session, datatyp
 write_raw_bids(raw, bids_path_eeg, overwrite=True, allow_preload=True, format='BrainVision', verbose=True)
 
 print(f'Finished writing EEG BIDS for participant {subject_id} and task {task}')
+
+
+
+
+###################################
+# EMG 2 BIDS
+###################################
+# EMG was recorded with a Delsys Trigno system (stream type 'EMG').
+# Load it into MNE the same way as the EEG stream above, then write it to BIDS
+# with write_raw_bids using the dedicated 'emg' datatype (as in the MNE-BIDS
+# FieldTrip EMG example: build a Raw, mark channels as 'emg', export as EDF).
+emg_stream = [s for s in streams if s['info']['type'][0] == 'EMG'][0]
+emg_stream_id = emg_stream['info']['stream_id']
+
+raw_emg = read_raw_xdf(fname=file_path.joinpath(xdf_files[0]), stream_ids=[emg_stream_id])  # mne.io.Raw
+
+# The Delsys stream exposes 9 fixed slots but only 6 are wired to a sensor
+# (DelSys_4, DelSys_5 and DelSys_8 are empty). Map the active channels to their
+# muscle/side; electrode placement follows the SENIAM guidelines:
+#   electrode 2/3 -> Rectus femoris (right/left)
+#   electrode 4/5 -> Biceps femoris (right/left)
+#   electrode 6/7 -> Gastrocnemius medialis (right/left)
+emg_channel_map = {
+    'DelSys_0': 'RfEmgR',   # Rectus femoris, right
+    'DelSys_1': 'RfEmgL',   # Rectus femoris, left
+    'DelSys_2': 'BfEmgR',   # Biceps femoris, right
+    'DelSys_3': 'BfEmgL',   # Biceps femoris, left
+    'DelSys_6': 'GmEmgR',   # Gastrocnemius medialis, right
+    'DelSys_7': 'GmEmgL',   # Gastrocnemius medialis, left
+}
+
+# keep only the wired channels, rename them, and tag them as EMG
+raw_emg.pick(list(emg_channel_map.keys()))
+raw_emg.rename_channels(emg_channel_map)
+raw_emg.set_channel_types({ch: 'emg' for ch in raw_emg.ch_names})
+
+# Use the effective sample rate from the EMG stream (derived from the LSL
+# timestamps), not the nominal rate. EDF stores integer sample rates, so round
+# it (the sub-Hz remainder is negligible) and let MNE pad the final partial
+# data record.
+srate_emg = round(get_effective_srate_xdf([emg_stream]))
+with raw_emg.info._unlock():
+    raw_emg.info['sfreq'] = float(srate_emg)
+    raw_emg.info['lowpass'] = srate_emg / 2.0
+
+raw_emg.info['line_freq'] = 50  # power line frequency, required by BIDS
+
+# write EMG to BIDS as EDF (BIDS allows BDF or EDF for the 'emg' datatype)
+bids_path_emg = BIDSPath(subject=subject_id, task=task, session=session, datatype='emg', root=DIR_BIDS_ROOT)
+write_raw_bids(
+    raw_emg,
+    bids_path_emg,
+    format='EDF',
+    emg_placement='Other',
+    allow_preload=True,
+    overwrite=True,
+    verbose=True,
+)
+
+# complete the emg.json sidecar (SENIAM placement description + acquisition metadata)
+emg_sidecar = bids_path_emg.copy().update(suffix='emg', extension='.json')
+update_sidecar_json(
+    bids_path=emg_sidecar,
+    entries={
+        'Manufacturer': 'Delsys',
+        'ManufacturersModelName': 'Trigno',
+        'EMGReference': 'bipolar',
+        'EMGGround': 'n/a',
+        'EMGPlacementSchemeDescription': (
+            'Surface electrodes placed according to the SENIAM guidelines '
+            '(Surface ElectroMyoGraphy for the Non-Invasive Assessment of Muscles).'
+        ),
+    },
+)
+
+print(f'Finished writing EMG BIDS for participant {subject_id} and task {task}')
 
 
 
