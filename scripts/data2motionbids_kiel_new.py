@@ -10,7 +10,6 @@ from motionbids import (
     export_bids_motion,
     validate_motion_data,
     create_bids_directory_structure,
-    export_dataset_description,
 )
 
 from src.config import DIR_BIDS_ROOT, DIR_PROJ
