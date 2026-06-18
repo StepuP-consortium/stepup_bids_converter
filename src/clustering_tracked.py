@@ -586,10 +586,51 @@ def _quality_checks(grid, mob_grid, mob_track_ids, n_rigid, n_markers,
                 frames_jump_gt_250mm=frames_jump_gt_250)
 
 
+def _label_high_markers(high_grid):
+    """Order and name the high-band markers by role.
+
+    The treadmill marker does not move, so it has the smallest 3D positional
+    spread; of the remaining trunk markers the lower-median-height one is the
+    lower back and the higher one is the sternum. Robust to which markers keep a
+    stable id and which fragment (the tracking already happened).
+
+    Returns ``(order, names)`` reindexing the high tracks to
+    ``[treadmill, lower_back, sternum]`` (for the 3-marker Kiel case).
+    """
+    n = high_grid.shape[1]
+    stds, med_z = [], []
+    for k in range(n):
+        col = high_grid[:, k, :]
+        v = ~np.isnan(col[:, 0])
+        stds.append(float(np.linalg.norm(col[v].std(axis=0))) if v.any() else np.inf)
+        med_z.append(float(np.median(col[v, 2])) if v.any() else -np.inf)
+    treadmill = int(np.argmin(stds))
+    trunk = sorted((k for k in range(n) if k != treadmill), key=lambda k: med_z[k])
+    order = [treadmill] + trunk
+    names = (["treadmill", "lower_back", "sternum"] if n == 3
+             else ["treadmill"] + [f"trunk_{j}" for j in range(len(trunk))])
+    return order, names
+
+
+def _dominant_ids(track_ids):
+    """Most frequent trajectory id per track (ignoring -1); for diagnostics."""
+    out = []
+    for k in range(track_ids.shape[1]):
+        col = track_ids[:, k]
+        col = col[col >= 0]
+        if col.size:
+            vals, counts = np.unique(col, return_counts=True)
+            out.append(int(vals[counts.argmax()]))
+        else:
+            out.append(-1)
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Public entry point
 # --------------------------------------------------------------------------- #
-def cluster_markers_tracked(rows, timestamps, sr=100.0, n_markers=5, **overrides):
+def cluster_markers_tracked(rows, timestamps, sr=100.0, n_markers=5, n_feet=2,
+                            **overrides):
     """Cluster fragmented Qualisys marker rows into ``n_markers`` continuous tracks.
 
     Parameters
@@ -605,22 +646,37 @@ def cluster_markers_tracked(rows, timestamps, sr=100.0, n_markers=5, **overrides
     **overrides
         Any field of :class:`ClusterParams` to override.
 
+    n_feet : int
+        Number of near-floor (foot) markers; the rest (``n_markers - n_feet``)
+        are the high markers (treadmill + trunk). For Kiel: 2 feet, 3 high.
+    **overrides
+        Any field of :class:`ClusterParams` to override.
+
     Returns
     -------
     grid : ndarray, shape (n_frames, n_markers, 3)
         Per-marker xyz on the ``sr`` frame grid, NaN where a marker is missing.
-        Channel order is rigid markers first (treadmill, then trunk markers low ->
-        high Z), then the mobile markers (e.g. left_foot, right_foot).
+        Channel order is the high markers first (treadmill, lower_back, sternum),
+        then the feet (left_foot, right_foot).
     names : list[str]
         Tracked-point name per channel, aligned with ``grid``'s second axis.
     info : dict
-        Diagnostics and QC. Keys: ``stable_ids``, ``names``, ``coverage`` (per
-        channel %), ``max_jump`` (per channel mm), ``min_mobile_distance``,
-        ``id_cross_assignments``, ``frames_jump_gt_250mm``, ``outliers_removed``
-        (per channel) and ``outliers_removed_total``, ``label_confidence``,
-        ``label_separation_d``, ``label_axis``, ``label_low_confidence``,
-        ``checks`` (dict of pass/fail flags), ``all_checks_pass`` and
-        ``warnings``.
+        Diagnostics and QC. Keys: ``high_marker_ids``, ``foot_ids``, ``names``,
+        ``coverage`` (per channel %), ``max_jump`` (per channel mm),
+        ``min_mobile_distance``, ``id_cross_assignments``, ``frames_jump_gt_250mm``,
+        ``outliers_removed`` (per channel) and ``outliers_removed_total``,
+        ``label_confidence``, ``label_separation_d``, ``label_axis``,
+        ``label_low_confidence``, ``checks`` (dict of pass/fail flags),
+        ``all_checks_pass`` and ``warnings``.
+
+    Notes
+    -----
+    Markers are separated by *height*, not by whether their trajectory id is
+    stable. The treadmill + trunk markers sit well above the floor while the feet
+    hug it, so a foot that happens to keep a stable id is still tracked as a foot
+    (and a trunk marker that fragments is still tracked as a trunk marker). Both
+    bands are tracked with the shared :class:`_MobileTracker` (id-continuity pin +
+    gated nearest-neighbour), then role-labelled.
     """
     params = ClusterParams(**overrides)
 
@@ -636,61 +692,46 @@ def cluster_markers_tracked(rows, timestamps, sr=100.0, n_markers=5, **overrides
 
     frame_of_row, n_frames = _build_frame_index(timestamps, sr)
     warnings = []
+    n_high = n_markers - n_feet
+    if n_high < 1 or n_feet < 0:
+        raise ValueError(f"n_feet={n_feet} incompatible with n_markers={n_markers}")
 
-    # 1. Classify trajectory ids into rigid (stable) vs mobile (fragmented).
-    stable_ids = _classify_marker_ids(ids, n_frames, params.stable_frac)
-    n_stable = len(stable_ids)
-    n_mobile = n_markers - n_stable
-    if n_mobile < 1:
-        raise ValueError(
-            f"Found {n_stable} stable ids but expected {n_markers} markers; "
-            f"no mobile markers left to track. Check n_markers / data."
-        )
-    if not (2 <= n_stable <= n_markers):
-        warnings.append(
-            f"Unexpected stable-id count ({n_stable}); expected the rigid markers "
-            f"(treadmill + trunk). Proceeding with {n_mobile} mobile tracks."
-        )
+    # 1. Split rows by height: feet near the floor, treadmill + trunk above it.
+    low_mask = xyz[:, 2] < params.mobile_z_max
+    high_mask = ~low_mask
 
-    # 2. Resolve the rigid markers and decide their output order / names.
-    rigid_grid, rigid_markers = _resolve_rigid_markers(
-        xyz, ids, frame_of_row, n_frames, stable_ids, params.rigid_max_anchor_dist)
-    rigid_order, rigid_names = _order_and_name_rigid_markers(rigid_markers)
+    # 2. Track each band independently (handles stable AND fragmented ids alike).
+    fp_h, fi_h = _group_rows_by_frame(xyz, ids, frame_of_row, n_frames, high_mask)
+    high_grid, high_tids = _MobileTracker(n_high, params).run(fp_h, fi_h, n_frames)
+    fp_l, fi_l = _group_rows_by_frame(xyz, ids, frame_of_row, n_frames, low_mask)
+    foot_grid, foot_tids = _MobileTracker(n_feet, params).run(fp_l, fi_l, n_frames)
 
-    # 3. Track the mobile (foot) markers.
-    mobile_mask = (~np.isin(ids, stable_ids)) & (xyz[:, 2] < params.mobile_z_max)
-    frame_points, frame_ids = _group_rows_by_frame(
-        xyz, ids, frame_of_row, n_frames, mobile_mask)
-    mob_grid, mob_track_ids = _MobileTracker(n_mobile, params).run(
-        frame_points, frame_ids, n_frames)
-
-    # 4. Label the mobile tracks left / right.
-    label = _label_feet(mob_grid, params)
+    # 3. Role-label: high markers by static/height, feet by mediolateral side.
+    high_order, high_names = _label_high_markers(high_grid)
+    high_grid = high_grid[:, high_order, :]
+    high_tids = high_tids[:, high_order]
+    label = _label_feet(foot_grid, params)
     if label.warning:
         warnings.append(label.warning)
+    foot_grid = foot_grid[:, label.order, :]
+    foot_tids = foot_tids[:, label.order]
 
-    # 5. Assemble the output grid in a stable channel order.
+    # 4. Assemble the output grid: high markers first, then feet.
     grid = np.full((n_frames, n_markers, 3), np.nan)
-    names = []
-    for col, slot in enumerate(rigid_order):
-        grid[:, col, :] = rigid_grid[:, slot, :]
-        names.append(rigid_names[col])
-    mob_grid = mob_grid[:, label.order, :]
-    mob_track_ids = mob_track_ids[:, label.order]
-    for j in range(n_mobile):
-        grid[:, len(rigid_order) + j, :] = mob_grid[:, j, :]
-        names.append(label.names[j])
+    grid[:, :n_high, :] = high_grid
+    grid[:, n_high:, :] = foot_grid
+    names = list(high_names) + list(label.names)
 
-    # 6. Drop isolated trajectory outliers (sunlight reflections etc.).
+    # 5. Drop isolated trajectory outliers (sunlight reflections etc.).
     outliers = _remove_trajectory_outliers(
         grid, params.outlier_spike_mm, params.outlier_max_gap, params.outlier_iters)
-    mob_grid = grid[:, len(rigid_order):, :]  # keep the QC view in sync
+    foot_grid = grid[:, n_high:, :]  # keep the QC view in sync with the cleaned grid
 
-    # 7. Quality control + assemble the info report.
-    qc = _quality_checks(grid, mob_grid, mob_track_ids, len(rigid_order),
-                          n_markers, n_mobile, params)
+    # 6. Quality control + assemble the info report.
+    qc = _quality_checks(grid, foot_grid, foot_tids, n_high, n_markers, n_feet, params)
     info = {
-        "stable_ids": stable_ids.tolist(),
+        "high_marker_ids": _dominant_ids(high_tids),
+        "foot_ids": _dominant_ids(foot_tids),
         "names": names,
         "coverage": qc["coverage"],
         "max_jump": qc["max_jump"],

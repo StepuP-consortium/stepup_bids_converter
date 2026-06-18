@@ -6,4 +6,7 @@ __pycache__
 # uv enviroment
 uv.lock
 .venv
+
+# claude
 .claude
+*.log
